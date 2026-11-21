@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Мой год по звёздам</title>
+  <meta name="description" content="Соляр онлайн простыми словами: что ждёт вас в году от дня рождения до следующего дня рождения.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+
+  <main class="wrap">
+    <header class="hero">
+      <div class="badge">Соляр · солнечный гороскоп</div>
+      <h1>Что ждёт вас<br><span>в новом году жизни?</span></h1>
+      <p class="lead">Заполните пару полей — и получите понятный прогноз на год, по месяцам и на всю жизнь. Без сложных терминов.</p>
+    </header>
+
+    <form id="form" class="card form" novalidate autocomplete="off">
+      <div class="field">
+        <label for="name">Как вас зовут? <em>необязательно</em></label>
+        <input id="name" type="text" placeholder="Например, Анна" maxlength="40">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="date">Дата рождения</label>
+          <input id="date" type="date" required min="1900-01-01" max="2100-12-31">
+        </div>
+        <div class="field">
+          <label for="time">Время рождения</label>
+          <input id="time" type="time" value="12:00">
+          <label class="check"><input id="noTime" type="checkbox"> Не знаю точно</label>
+        </div>
+      </div>
+
+      <div class="field city">
+        <label for="birthCity">Город рождения</label>
+        <input id="birthCity" type="text" placeholder="Начните вводить город…" required>
+        <ul class="suggest" id="birthList" role="listbox"></ul>
+      </div>
+
+      <div class="field">
+        <label class="check big"><input id="sameCity" type="checkbox" checked> День рождения встречаю в городе рождения</label>
+      </div>
+
+      <div class="field city" id="relocWrap" hidden>
+        <label for="relocCity">Где вы будете в день рождения?</label>
+        <input id="relocCity" type="text" placeholder="Город, где встретите день рождения">
+        <ul class="suggest" id="relocList" role="listbox"></ul>
+        <p class="hint">Соляр строится на то место, где вы находитесь в момент дня рождения — поэтому многие специально уезжают «за хорошим годом».</p>
+      </div>
+
+      <div class="field">
+        <label for="year">На какой год прогноз?</label>
+        <div class="years" id="years" role="radiogroup"></div>
+      </div>
+
+      <p class="error" id="error" role="alert" hidden></p>
+      <button type="submit" class="btn" id="submit">Узнать свой год ✨</button>
+    </form>
+
+    <section id="result" hidden></section>
+
+    <footer class="foot">
+      Расчёт выполняется прямо в браузере. Поиск городов — через Open‑Meteo.<br>
+      Гороскоп — для вдохновения и самопознания, а не руководство к действию.
+    </footer>
+  </main>
+
+  <script src="astro.js"></script>
+  <script src="texts.js"></script>
+  <script src="texts-more.js"></script>
+  <script src="forecast.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
