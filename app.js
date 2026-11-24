@@ -305,6 +305,7 @@
       try { await navigator.clipboard.writeText(location.href); toast('Ссылка скопирована'); }
       catch { prompt('Скопируйте ссылку:', location.href); }
     } else if (act === 'again') form.scrollIntoView({ behavior: 'smooth' });
+    else if (act === 'rays') e.target.closest('.sky-card').classList.toggle('rays', e.target.checked);
   });
 
   function toast(msg) {
@@ -557,6 +558,7 @@
           AC <b>${pos(chart.asc)}</b> · DC <b>${pos(chart.asc + 180)}</b> · MC <b>${pos(chart.mc)}</b> · IC <b>${pos(chart.mc + 180)}</b></p>
       </div>
       ${r.timeKnown ? '' : noTimeNote}
+      ${skyCard(r.srJd, chart.asc, 'в момент соляра')}
 
       <div class="card">
         <h3 class="h">Планеты соляра</h3>
@@ -690,6 +692,7 @@
         <summary>Натальная карта для знатоков</summary>
         <div class="pro-body">
           ${wheel(natal, natalAsp, null)}
+          ${skyCard(r.natalJd, natal.asc, 'в момент вашего рождения')}
           <div class="tablewrap"><table>
             <thead><tr><th>Планета</th><th>Положение</th>${r.timeKnown ? '<th>Дом</th>' : ''}<th>Сила</th></tr></thead>
             <tbody>${natal.planets.map(p => { const [dg, cls] = dignity(p.key, signOf(p.lon)); return `<tr><td><span class="g">${T.planets[p.key].glyph}</span>${T.planets[p.key].name}${p.retro ? ' <span class="retro">R</span>' : ''}</td><td>${pos(p.lon)} <span class="muted">${T.signs[signOf(p.lon)]}</span></td>${r.timeKnown ? `<td>${p.house}</td>` : ''}<td class="${cls}">${dg}</td></tr>`; }).join('')}</tbody>
@@ -697,6 +700,79 @@
           ${r.timeKnown ? `<p class="meta">AC <b>${pos(natal.asc)}</b> · MC <b>${pos(natal.mc)}</b> · дома: ${natal.system}</p>` : ''}
         </div>
       </details>`;
+  }
+
+  // ---------- Реальное расположение планет (вид сверху на Солнечную систему) ----------
+  const SKY_COL = { mercury: '#c9b8a6', venus: '#f5d38b', earth: '#6fb7ff', mars: '#ff7a5c', jupiter: '#e8b98a', saturn: '#e9d49a', uranus: '#8fe3e8', neptune: '#6f8dff', pluto: '#c7a0d8' };
+  function skyMap(jdUT, rot, when) {
+    const jd = A.ttFromUt(jdUT);
+    const C = 280, RZ0 = 238, RZ1 = 266;
+    const scale = a => 20 + 30 * Math.sqrt(a);
+    const ang = lon => (180 + (lon - rot)) * Math.PI / 180;
+    const xy = (lon, r) => [r * Math.cos(ang(lon)), -r * Math.sin(ang(lon))]; // относительно центра
+    const f = n => n.toFixed(1);
+    const helioKeys = ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'];
+    const H = Object.fromEntries(helioKeys.map(k => [k, A.helioPos(k, jd)]));
+    const [ex, ey] = xy(H.earth.lon, scale(H.earth.a));
+    // точка на кольце зодиака по лучу с Земли в направлении эклиптической долготы lon
+    const rayEnd = (lon, R) => {
+      const a = ang(lon), ux = Math.cos(a), uy = -Math.sin(a);
+      const b = ex * ux + ey * uy, t = -b + Math.sqrt(b * b - (ex * ex + ey * ey) + R * R);
+      return [ex + t * ux, ey + t * uy];
+    };
+    const angOf = ([x, y]) => Math.atan2(-y, x);
+    const arcPt = (rad, R) => [C + R * Math.cos(rad), C - R * Math.sin(rad)];
+    let s = `<svg class="wheel sky" viewBox="0 0 ${C * 2} ${C * 2}" role="img" aria-label="Расположение планет ${when}">`;
+    s += `<defs><radialGradient id="sunglow"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".45" stop-color="#f5c76b"/><stop offset="1" stop-color="#f5c76b" stop-opacity="0"/></radialGradient></defs>`;
+    // Зодиак — так, как его видно с Земли (границы знаков по лучам из Земли)
+    for (let i = 0; i < 12; i++) {
+      const a0 = angOf(rayEnd(i * 30, RZ1)), a1 = angOf(rayEnd(i * 30 + 30, RZ1));
+      const sweep = ((a1 - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const big = sweep > Math.PI ? 1 : 0;
+      const [x0, y0] = arcPt(a0, RZ1), [x1, y1] = arcPt(a0 + sweep, RZ1), [x2, y2] = arcPt(a0 + sweep, RZ0), [x3, y3] = arcPt(a0, RZ0);
+      s += `<path class="el${i % 4}" d="M${f(x0)},${f(y0)} A${RZ1},${RZ1} 0 ${big} 0 ${f(x1)},${f(y1)} L${f(x2)},${f(y2)} A${RZ0},${RZ0} 0 ${big} 1 ${f(x3)},${f(y3)} Z"/>`;
+      s += `<line class="cusp" x1="${f(x0)}" y1="${f(y0)}" x2="${f(x3)}" y2="${f(y3)}"/>`;
+      const [gx, gy] = arcPt(a0 + sweep / 2, (RZ0 + RZ1) / 2);
+      s += `<text class="sg" x="${f(gx)}" y="${f(gy)}" text-anchor="middle" dominant-baseline="central">${T.signGlyphs[i]}</text>`;
+    }
+    s += `<circle class="ring" cx="${C}" cy="${C}" r="${RZ0}"/><circle class="ring" cx="${C}" cy="${C}" r="${RZ1}"/>`;
+    for (const k of helioKeys) s += `<circle class="orbit${k === 'earth' ? ' earth' : ''}" cx="${C}" cy="${C}" r="${f(scale(H[k].a))}"/>`;
+    // Лучи с Земли: знак планеты в гороскопе = направление на неё с Земли
+    const geoLon = Object.fromEntries(A.KEYS.map(k => [k, A.planetLon(k, jd)]));
+    const ray = k => {
+      const [rx, ry] = rayEnd(geoLon[k], RZ0);
+      return `<line class="ray" x1="${f(C + ex)}" y1="${f(C + ey)}" x2="${f(C + rx)}" y2="${f(C + ry)}"/><circle class="rayend" cx="${f(C + rx)}" cy="${f(C + ry)}" r="3"/>`;
+    };
+    const title = k => `${T.planets[k].name}: ${fmtDeg(geoLon[k])} ${T.signsIn[signOf(geoLon[k])]} (вид с Земли)`;
+    s += `<g class="sp" tabindex="0">${ray('sun')}<circle cx="${C}" cy="${C}" r="22" fill="url(#sunglow)"/><circle cx="${C}" cy="${C}" r="8" fill="#ffd77a"/><title>${title('sun')}</title></g>`;
+    for (const k of helioKeys) {
+      const [x, y] = xy(H[k].lon, scale(H[k].a)), rad = ['jupiter', 'saturn'].includes(k) ? 6.5 : k === 'earth' ? 5.5 : 4.5;
+      const px = f(C + x), py = f(C + y);
+      if (k === 'earth') {
+        const [mx, my] = xy(geoLon.moon, 11);
+        s += `<g class="sp" tabindex="0">${ray('moon')}<circle cx="${f(C + x + mx)}" cy="${f(C + y + my)}" r="2.6" fill="#d8d8e6"/><title>${title('moon')}</title></g>`;
+        s += `<circle cx="${px}" cy="${py}" r="${rad}" fill="${SKY_COL.earth}" stroke="#fff" stroke-width="1.2"><title>Земля — отсюда мы смотрим на небо</title></circle>`;
+        s += `<text class="skl earth" x="${px}" y="${f(C + y + 17)}" text-anchor="middle">Земля</text>`;
+        continue;
+      }
+      const retro = A.diff(A.planetLon(k, jd + 0.5), A.planetLon(k, jd - 0.5)) < 0;
+      const [lx, ly] = xy(H[k].lon, scale(H[k].a) + 14);
+      s += `<g class="sp" tabindex="0">${ray(k)}`;
+      if (k === 'saturn') s += `<ellipse cx="${px}" cy="${py}" rx="11" ry="3.5" fill="none" stroke="${SKY_COL.saturn}" stroke-width="1.2" transform="rotate(-20 ${px} ${py})"/>`;
+      s += `<circle cx="${px}" cy="${py}" r="${rad}" fill="${SKY_COL[k]}"/>`;
+      s += `<text class="skl${retro ? ' r' : ''}" x="${f(C + lx)}" y="${f(C + ly)}" text-anchor="middle" dominant-baseline="central">${T.planets[k].glyph}${retro ? 'R' : ''}</text>`;
+      s += `<title>${title(k)}${retro ? ', ретроградность: Земля обгоняет планету, и кажется, что та идёт назад' : ''}</title></g>`;
+    }
+    return s + '</svg>';
+  }
+  function skyCard(jdUT, rot, when) {
+    return `<div class="card sky-card">
+        <h3 class="h">Как планеты на самом деле стояли ${when}</h3>
+        <p class="meta">Вид сверху на Солнечную систему: в центре Солнце, вокруг орбиты планет, голубая точка — Земля, рядом с ней Луна. Расстояния сжаты, иначе дальние планеты не поместились бы.</p>
+        ${skyMap(jdUT, rot, when)}
+        <label class="sky-toggle"><input type="checkbox" data-act="rays"> Показать, как каждая планета видна с Земли</label>
+        <p class="meta">Знак зодиака планеты в гороскопе — это направление, в котором её видно <b>с Земли</b>. Нажмите на планету (или включите галочку): линия от Земли покажет, на фоне какого знака она находится. Поэтому Солнце в гороскопе стоит в знаке напротив того, где находится Земля. <span class="r">R</span> — ретроградная планета: Земля обгоняет её по орбите, и с Земли кажется, что она пятится назад. Карта повёрнута так же, как круг гороскопа выше.</p>
+      </div>`;
   }
 
   // ---------- Колесо карты (SVG) ----------

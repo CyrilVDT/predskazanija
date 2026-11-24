@@ -106,6 +106,13 @@
     return norm(Math.atan2(p.y - e.y, p.x - e.x) * DEG + 1.396971 * T + nutLon(T));
   }
 
+  // Гелиоцентрическое положение (вид сверху на Солнечную систему), эклиптика даты
+  function helioPos(key, jd) {
+    const T = (jd - 2451545) / 36525;
+    const p = helio(EL[key], T);
+    return { lon: norm(Math.atan2(p.y, p.x) * DEG + 1.396971 * T), r: Math.hypot(p.x, p.y), a: EL[key][0] };
+  }
+
   const KEYS = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'];
   const diff = (a, b) => ((a - b + 540) % 360) - 180; // a − b в диапазоне −180..180
 
@@ -229,5 +236,5 @@
     return jd - deltaT(yearOfJd(jd)) / 86400;
   }
 
-  global.Astro = { norm, diff, jdFromMs, msFromJd, sunLon, moonLon, planetLon, ttFromUt, chart, solarReturn, lunarReturn, aspects, houseOf, localToUtc, KEYS, ASPECTS };
+  global.Astro = { norm, diff, jdFromMs, msFromJd, sunLon, moonLon, planetLon, helioPos, ttFromUt, chart, solarReturn, lunarReturn, aspects, houseOf, localToUtc, KEYS, ASPECTS };
 })(window);
