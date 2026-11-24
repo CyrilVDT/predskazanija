@@ -222,6 +222,9 @@
     const [hh, mm] = (d.time || '12:00').split(':').map(Number);
     return A.jdFromMs(A.localToUtc(y, m, day, hh, mm, d.birth.tz));
   }
+  let wheelMode = 'solar';
+  try { wheelMode = localStorage.getItem('wheelMode') || 'solar'; } catch (e) { /* хранилище недоступно */ }
+
   function compute(d) {
     const timeKnown = !!d.time;
     const natalJd = birthMoment(d);
@@ -305,6 +308,11 @@
       try { await navigator.clipboard.writeText(location.href); toast('Ссылка скопирована'); }
       catch { prompt('Скопируйте ссылку:', location.href); }
     } else if (act === 'again') form.scrollIntoView({ behavior: 'smooth' });
+    else if (act === 'wheel') {
+      wheelMode = e.target.closest('[data-act]').dataset.mode;
+      try { localStorage.setItem('wheelMode', wheelMode); } catch (err) { /* хранилище недоступно */ }
+      state.cache.chart = null; renderPanel();
+    }
     else if (act === 'rays') e.target.closest('.sky-card').classList.toggle('rays', e.target.checked);
   });
 
@@ -545,13 +553,20 @@
     aspects.forEach(x => { aspMap[x.a.key + x.b.key] = x; aspMap[x.b.key + x.a.key] = x; });
     const hemis = { up: chart.planets.filter(p => p.house >= 7).length, east: chart.planets.filter(p => p.house >= 10 || p.house <= 3).length };
 
+    const byNatal = wheelMode === 'natal' && r.timeKnown;
     return `${yearNav(d.year)}
       <div class="card">
-        ${wheel(chart, aspects, r.natal.planets)}
+        ${r.timeKnown ? `<div class="seg" role="group" aria-label="Как повернуть круг">
+          <button data-act="wheel" data-mode="solar" class="${byNatal ? '' : 'on'}">По соляру</button>
+          <button data-act="wheel" data-mode="natal" class="${byNatal ? 'on' : ''}">По натальной карте (как на geocult)</button>
+        </div>` : ''}
+        ${byNatal ? wheel(chart, aspects, r.natal.planets, { houses: r.natal, extra: chart }) : wheel(chart, aspects, r.natal.planets)}
         <div class="legend">
           <span><i class="lg in"></i>планеты соляра</span><span><i class="lg out"></i>натальные планеты (внешний круг)</span>
+          ${byNatal ? '<span><i class="lg x"></i>дома соляра; белым — натальные дома</span>' : ''}
           <span><i class="lg harm"></i>гармоничный аспект</span><span><i class="lg tense"></i>напряжённый аспект</span>
         </div>
+        ${byNatal ? '<p class="meta">Круг повёрнут по вашему натальному асценденту, как на geocult. Белые линии и номера — натальные дома, красные — дома соляра. Так видно, в какой натальный дом попадает асцендент соляра.</p>' : ''}
         <p class="meta">Момент соляра: <b>${fmtDate(r.srMs, tz, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</b> (${esc(tz)}) ·
           ${new Date(r.srMs).toISOString().slice(0, 16).replace('T', ' ')} UTC<br>
           Место: <b>${esc(d.reloc.name)}</b> ${d.reloc.lat.toFixed(4)}°, ${d.reloc.lon.toFixed(4)}° · дома: <b>${chart.system}</b><br>
@@ -790,9 +805,12 @@
     }
     return ps;
   }
-  function wheel(chart, aspects, outer) {
+  // opt.houses — карта, чьи дома и асцендент задают поворот круга (по умолчанию сама chart);
+  // opt.extra — вторая сетка домов поверх (красным), как дома соляра на geocult
+  function wheel(chart, aspects, outer, opt = {}) {
     const C = 260, RO = 250, R1 = 212, R2 = 182, RP = 160, RD = 138, R3 = 78;
-    const ang = lon => (180 + (lon - chart.asc)) * Math.PI / 180;
+    const H = opt.houses || chart, X = opt.extra;
+    const ang = lon => (180 + (lon - H.asc)) * Math.PI / 180;
     const pt = (lon, r) => [C + r * Math.cos(ang(lon)), C - r * Math.sin(ang(lon))];
     const f = n => n.toFixed(1);
     let s = `<svg class="wheel" viewBox="0 0 ${C * 2} ${C * 2}" role="img" aria-label="Карта">`;
@@ -809,11 +827,11 @@
       }
     }
     s += `<circle class="ring" cx="${C}" cy="${C}" r="${R1}"/><circle class="ring" cx="${C}" cy="${C}" r="${R2}"/><circle class="ring" cx="${C}" cy="${C}" r="${R3}"/>`;
-    chart.cusps.forEach((c, i) => {
+    H.cusps.forEach((c, i) => {
       const axis = i % 3 === 0;
       const [x0, y0] = pt(c, R2), [x1, y1] = pt(c, R3);
       s += `<line class="${axis ? 'axis' : 'cusp'}" x1="${f(x0)}" y1="${f(y0)}" x2="${f(x1)}" y2="${f(y1)}"/>`;
-      const mid = c + A.norm(chart.cusps[(i + 1) % 12] - c) / 2;
+      const mid = c + A.norm(H.cusps[(i + 1) % 12] - c) / 2;
       const [hx, hy] = pt(mid, R3 - 11);
       s += `<text class="hn" x="${f(hx)}" y="${f(hy)}" text-anchor="middle" dominant-baseline="central">${i + 1}</text>`;
       if (!axis) {
@@ -821,7 +839,21 @@
         s += `<text class="cd" x="${f(cx)}" y="${f(cy)}" text-anchor="middle" dominant-baseline="central">${Math.floor(A.norm(c) % 30)}°</text>`;
       }
     });
-    [['AC', chart.asc], ['DC', chart.asc + 180], ['MC', chart.mc], ['IC', chart.mc + 180]].forEach(([l, lon]) => {
+    if (X) {
+      X.cusps.forEach((c, i) => {
+        const axis = i % 3 === 0;
+        const [x0, y0] = pt(c, axis ? R1 + 22 : R2), [x1, y1] = pt(c, R3);
+        s += `<line class="xcusp${axis ? ' axis' : ''}" x1="${f(x0)}" y1="${f(y0)}" x2="${f(x1)}" y2="${f(y1)}"/>`;
+        const mid = c + A.norm(X.cusps[(i + 1) % 12] - c) / 2;
+        const [hx, hy] = pt(mid, R3 + 28);
+        s += `<text class="xhn" x="${f(hx)}" y="${f(hy)}" text-anchor="middle" dominant-baseline="central">${i + 1}</text>`;
+      });
+      [['AC', X.asc], ['MC', X.mc]].forEach(([l, lon]) => {
+        const [lx, ly] = pt(lon, R1 + 32);
+        s += `<text class="xlab" x="${f(lx)}" y="${f(ly)}" text-anchor="middle" dominant-baseline="central"><title>${l} соляра ${fmtDeg(lon)} ${T.signsIn[signOf(lon)]}</title>${l}</text>`;
+      });
+    }
+    [['AC', H.asc], ['DC', H.asc + 180], ['MC', H.mc], ['IC', H.mc + 180]].forEach(([l, lon]) => {
       const [lx, ly] = pt(lon - 6, R3 + 14), [dx, dy] = pt(lon + 6, R3 + 14);
       s += `<text class="lab" x="${f(lx)}" y="${f(ly)}" text-anchor="middle" dominant-baseline="central">${l}</text>`;
       s += `<text class="cd2" x="${f(dx)}" y="${f(dy)}" text-anchor="middle" dominant-baseline="central">${Math.floor(A.norm(lon) % 30)}°</text>`;

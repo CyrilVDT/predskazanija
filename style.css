@@ -320,3 +320,13 @@ details.pro[open] summary::after { transform: rotate(180deg); }
 .sky-card.rays .rayend { opacity: .85; }
 .sky-toggle { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: 13.5px; color: var(--muted); margin: 10px 0 0; cursor: pointer; }
 .sky-card .r { color: var(--rose); font-weight: 700; }
+
+/* Поворот круга по натальной карте */
+.seg { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0 0 14px; }
+.seg button { font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .18); background: transparent; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--violet); border-color: var(--violet); color: #fff; }
+.wheel .xcusp { stroke: rgba(255, 110, 110, .55); stroke-dasharray: 3 3; }
+.wheel .xcusp.axis { stroke: #ff6e6e; stroke-width: 1.6; stroke-dasharray: none; }
+.wheel .xhn { fill: #ff8a8a; font-size: 9.5px; }
+.wheel .xlab { fill: #ff6e6e; font-size: 11px; font-weight: 800; }
+.lg.x { background: #ff6e6e; }
